@@ -5,40 +5,43 @@ const socketio = require("socket.io");
 const app = express();
 const httpserver = http.Server(app);
 
-// Enable CORS to allow connections from InfinityFree (or any origin for now)
+// Allow connections from your InfinityFree frontend
 const io = socketio(httpserver, {
   cors: {
-    origin: "*", // Replace with your InfinityFree domain for security
+    origin: "https://justathing.ct.ws",
     methods: ["GET", "POST"]
   }
 });
 
-// Use Render's dynamic port, fallback to 3000 for local development
+// Use Render's dynamic port or fallback for local dev
 const PORT = process.env.PORT || 3000;
 httpserver.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
-let rooms = [];
-let usernames = [];
+let rooms = {};
+let usernames = {};
 
 io.on('connection', (socket) => {
+  console.log("A user connected");
 
-  socket.on("join", (room, username) => {
-    if (username !== "") {
+  socket.on("join", ({ room, username }) => {
+    if (username && room) {
       rooms[socket.id] = room;
       usernames[socket.id] = username;
-      socket.leaveAll();
+      socket.leaveAll();  // Ensure user leaves other rooms
       socket.join(room);
-      io.in(room).emit("recieve", `Server: ${username} has entered the chat! (ﾉ◕ヮ◕)ﾉ*.✧`);
-      socket.emit("join", room);
+      io.to(room).emit("recieve", `Server: ${username} has entered the chat! (ﾉ◕ヮ◕)ﾉ*.✧`);
     }
   });
 
-  socket.on("send", (message) => {
+  socket.on("chatMessage", (message) => {
     const room = rooms[socket.id];
     const username = usernames[socket.id];
 
+    if (!room || !username) return;
+
+    // Special check for Server_Updates room
     if (room === "Server_Updates" && username !== "Server") {
       socket.emit("recieve", "Server: Only users with the valid privileges can send messages in the Server_Updates room");
       return;
@@ -53,16 +56,17 @@ io.on('connection', (socket) => {
       message = messageParts.join(' ');
     }
 
-    io.in(room).emit("recieve", `${username} : ${message}`);
+    io.to(room).emit("recieve", `${username}: ${message}`);
   });
 
-  socket.on("recieve", (message) => {
-    socket.emit("recieve", message);
+  socket.on("disconnect", () => {
+    console.log("A user disconnected");
+    const room = rooms[socket.id];
+    const username = usernames[socket.id];
+    if (room && username) {
+      io.to(room).emit("recieve", `Server: ${username} has left the chat.`);
+    }
+    delete rooms[socket.id];
+    delete usernames[socket.id];
   });
-});
-const io = require("socket.io")(server, {
-  cors: {
-    origin: "https://justathing.ct.ws",
-    methods: ["GET", "POST"]
-  }
 });
