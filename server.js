@@ -60,3 +60,9 @@ io.on('connection', (socket) => {
     socket.emit("recieve", message);
   });
 });
+const io = require("socket.io")(server, {
+  cors: {
+    origin: "https://justathing.ct.ws",
+    methods: ["GET", "POST"]
+  }
+});
