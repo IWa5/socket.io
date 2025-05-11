@@ -5,7 +5,7 @@ const { Server } = require("socket.io");
 const app = express();
 const httpserver = http.createServer(app);
 
-// Set up Socket.IO with CORS to allow only your frontend
+// Correct CORS setup
 const io = new Server(httpserver, {
   cors: {
     origin: "https://justathing.ct.ws",
@@ -13,21 +13,21 @@ const io = new Server(httpserver, {
   }
 });
 
-// Use Render's dynamic port or fallback locally
 const PORT = process.env.PORT || 3000;
 httpserver.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
 
-// Track room and username per socket
+// Room and username tracking
 const rooms = {};
 const usernames = {};
 
 io.on("connection", (socket) => {
   console.log("🔌 A user connected");
 
-  // Handle user joining a room
   socket.on("join", ({ room, username }) => {
+    console.log("JOIN EVENT:", { room, username }); // 🧪 TEST LINE
+
     if (!room || !username) return;
 
     rooms[socket.id] = room;
@@ -36,42 +36,33 @@ io.on("connection", (socket) => {
     socket.leaveAll();
     socket.join(room);
 
-    // Notify others in the room
     io.to(room).emit("recieve", `Server: ${username} has entered the chat! (ﾉ◕ヮ◕)ﾉ*.✧`);
-
-    // Confirm room join (can be used by client)
     socket.emit("join", room);
   });
 
-  // Handle chat messages
   socket.on("chatMessage", (message) => {
     const room = rooms[socket.id];
     const username = usernames[socket.id];
-
     if (!room || !username) return;
 
     if (room === "Server_Updates" && username !== "Server") {
-      socket.emit("recieve", "Server: Only users with the valid privileges can send messages in the Server_Updates room");
-      return;
+      return socket.emit("recieve", "❌ Only Server can send messages in Server_Updates.");
     }
 
     if (room === "Server_Updates") {
-      const [pin, ...messageParts] = message.split(' ');
+      const [pin, ...rest] = message.split(" ");
       if (pin !== "1024") {
-        socket.emit("recieve", "Server: Invalid PIN. Please enter the correct PIN followed by your message (e.g., '1024 your message')");
-        return;
+        return socket.emit("recieve", "🔒 Invalid PIN. Use: `1024 your message`.");
       }
-      message = messageParts.join(' ');
+      message = rest.join(" ");
     }
 
     io.to(room).emit("recieve", `${username}: ${message}`);
   });
 
-  // Handle disconnects
   socket.on("disconnect", () => {
     const room = rooms[socket.id];
     const username = usernames[socket.id];
-
     if (room && username) {
       io.to(room).emit("recieve", `Server: ${username} has left the chat.`);
     }
