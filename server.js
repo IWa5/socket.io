@@ -5,13 +5,15 @@ const socketio = require("socket.io");
 const app = express();
 const httpserver = http.Server(app);
 
+// Enable CORS to allow connections from InfinityFree (or any origin for now)
 const io = socketio(httpserver, {
   cors: {
-    origin: "*", // Ideally replace "*" with your frontend URL
+    origin: "*", // Replace with your InfinityFree domain for security
     methods: ["GET", "POST"]
   }
 });
 
+// Use Render's dynamic port, fallback to 3000 for local development
 const PORT = process.env.PORT || 3000;
 httpserver.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
@@ -21,7 +23,8 @@ let rooms = [];
 let usernames = [];
 
 io.on('connection', (socket) => {
-  socket.on("join", ({ room, username }) => {
+
+  socket.on("join", ({ room, username }) => {  // Should be fixed now.
     if (username !== "") {
       rooms[socket.id] = room;
       usernames[socket.id] = username;
@@ -51,17 +54,6 @@ io.on('connection', (socket) => {
     }
 
     io.in(room).emit("recieve", `${username} : ${message}`);
-  });
-
-  socket.on("typing", () => {
-    const room = rooms[socket.id];
-    const username = usernames[socket.id];
-    socket.to(room).emit("typing", `${username} is typing...`);
-  });
-
-  socket.on("stopTyping", () => {
-    const room = rooms[socket.id];
-    socket.to(room).emit("stopTyping");
   });
 
   socket.on("recieve", (message) => {
