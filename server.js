@@ -24,7 +24,7 @@ let usernames = [];
 
 io.on('connection', (socket) => {
 
-  socket.on("join", (room, username) => {  // ❌ Problem: expects 2 arguments, not an object
+  socket.on("join", ({ room, username }) => {  // Should be fixed now.
     if (username !== "") {
       rooms[socket.id] = room;
       usernames[socket.id] = username;
