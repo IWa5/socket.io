@@ -5,6 +5,11 @@ const socketio = require("socket.io");
 const app = express();
 const httpserver = http.Server(app);
 
+// Add this route for uptime monitoring
+app.get("/ping", (req, res) => {
+  res.status(200).send("pong");
+});
+
 const io = socketio(httpserver, {
   cors: {
     origin: "*", // Ideally replace "*" with your frontend URL
