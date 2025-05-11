@@ -1,62 +1,62 @@
 const http = require("http");
 const express = require("express");
-const { Server } = require("socket.io");
+const socketio = require("socket.io");
 
 const app = express();
-const httpserver = http.createServer(app);
+const httpserver = http.Server(app);
 
-// CORS setup: allow only your InfinityFree domain
-const io = new Server(httpserver, {
+// Enable CORS to allow connections from InfinityFree (or any origin for now)
+const io = socketio(httpserver, {
   cors: {
-    origin: "https://justathing.ct.ws",
+    origin: "*", // Replace with your InfinityFree domain for security
     methods: ["GET", "POST"]
   }
 });
 
-// Use Render's dynamic port or local fallback
+// Use Render's dynamic port, fallback to 3000 for local development
 const PORT = process.env.PORT || 3000;
 httpserver.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
 
-// Store rooms and usernames per socket
-const rooms = {};
-const usernames = {};
+let rooms = [];
+let usernames = [];
 
-io.on("connection", (socket) => {
-  console.log("🔌 A user connected");
+io.on('connection', (socket) => {
 
-  socket.on("join", ({ room, username }) => {
-    if (!room || !username) return;
-
-    // Store user info
-    rooms[socket.id] = room;
-    usernames[socket.id] = username;
-
-    // Join the room
-    socket.join(room);
-    io.to(room).emit("recieve", `🔔 ${username} has joined ${room}`);
+  socket.on("join", (room, username) => {
+    if (username !== "") {
+      rooms[socket.id] = room;
+      usernames[socket.id] = username;
+      socket.leaveAll();
+      socket.join(room);
+      io.in(room).emit("recieve", `Server: ${username} has entered the chat! (ﾉ◕ヮ◕)ﾉ*.✧`);
+      socket.emit("join", room);
+    }
   });
 
-  socket.on("chatMessage", (message) => {
+  socket.on("send", (message) => {
     const room = rooms[socket.id];
     const username = usernames[socket.id];
-    if (!room || !username) return;
 
-    // Server_Updates restriction
     if (room === "Server_Updates" && username !== "Server") {
-      return socket.emit("recieve", "❌ Only Users with valid privlages can send messages in Server_Updates.");
+      socket.emit("recieve", "Server: Only users with the valid privileges can send messages in the Server_Updates room");
+      return;
     }
 
-    // Handle PIN-protected message
     if (room === "Server_Updates") {
-      const [pin, ...rest] = message.split(" ");
+      const [pin, ...messageParts] = message.split(' ');
       if (pin !== "1024") {
-        return socket.emit("recieve", "🔒 Invalid PIN. Use: `PIN your message`.");
+        socket.emit("recieve", "Server: Invalid PIN. Please enter the correct PIN followed by your message (e.g., 'XXXX your message')");
+        return;
       }
-      message = rest.join(" ");
+      message = messageParts.join(' ');
     }
 
-    io.to(room).emit("recieve", `${username}: ${message}`);
+    io.in(room).emit("recieve", `${username} : ${message}`);
   });
 
+  socket.on("recieve", (message) => {
+    socket.emit("recieve", message);
+  });
+});
